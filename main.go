@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/alecthomas/kingpin"
 )
@@ -27,11 +28,13 @@ func main() {
 	case give.FullCommand():
 		assertNoUnstagedChanges()
 		user := findUser(*giveUser)
-		fmt.Println("Giving", *giveCoins, "coins to", user)
+		message := fmt.Sprintf("git-coin: Giving %v coins to %s", *giveCoins, user)
+		fmt.Println(message)
 	case donate.FullCommand():
 		assertNoUnstagedChanges()
 		user := findUser(*donateUser)
-		fmt.Println("Donating", *donateCoins, "coins to", user)
+		message := fmt.Sprintf("git-coin: Donating %v coins to %s", *giveCoins, user)
+		fmt.Println(message)
 	case list.FullCommand():
 		fmt.Println("TODO: list all coins")
 	}
@@ -66,7 +69,7 @@ func findUser(user string) string {
 		os.Exit(4)
 	}
 
-	actualUser := string(out)
+	actualUser := strings.TrimSpace(string(out))
 
 	if actualUser == "" {
 		fmt.Fprintln(os.Stderr, "User", *giveUser, "not found; using", *giveUser, "as-is")
