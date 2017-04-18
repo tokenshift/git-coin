@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/alecthomas/kingpin"
 )
@@ -117,6 +118,67 @@ func commit(message string) {
 }
 
 func listCoins() {
+	ledger := getLedger()
+	users := allUsers()
+
+	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 4, '-', 0)
+
+	for _, user := range users {
+		if coins, ok := ledger[strings.ToUpper(user)]; ok {
+			fmt.Fprintf(writer, "%s\t%v\n", user, coins)
+		}
+	}
+
+	writer.Flush()
+}
+
+// `allUsers` returns a list of all users in the git commit history, in order.
+// Case-insensitive collisions are omitted.
+func allUsers() []string {
+	users := make(map[string]string)
+
+	cmd := exec.Command("git", "log", "--pretty=format:%an <%ae>")
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(5)
+	}
+
+	if err = cmd.Start(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(6)
+	}
+
+	scanner := bufio.NewScanner(out)
+	for scanner.Scan() {
+		user := strings.TrimSpace(scanner.Text())
+		norm := strings.ToUpper(user)
+		users[norm] = user
+	}
+
+	if scanner.Err() != nil {
+		fmt.Fprintln(os.Stderr, scanner.Err())
+		os.Exit(8)
+	}
+
+	if err = cmd.Wait(); err != nil {
+		fmt.Fprintln(os.Stderr, scanner.Err())
+		os.Exit(9)
+	}
+
+	allUsers := make([]string, 0, len(users))
+	for _, user := range users {
+		allUsers = append(allUsers, user)
+	}
+
+	sort.Strings(allUsers)
+
+	return allUsers
+}
+
+// `ledger` returns a map of users to their current balances.
+// Users are uppercased for consistency.
+func getLedger() map[string]float64 {
 	ledger := make(map[string]float64)
 
 	cmd := exec.Command("git", "log", "--grep=^git-coin:", "--pretty=format:%an <%ae> - %s")
@@ -178,51 +240,5 @@ func listCoins() {
 		os.Exit(9)
 	}
 
-	for _, user := range allUsers() {
-		if coins, ok := ledger[strings.ToUpper(user)]; ok {
-			fmt.Println(user, "has", coins, "coins")
-		}
-	}
-}
-
-func allUsers() []string {
-	users := make(map[string]string)
-
-	cmd := exec.Command("git", "log", "--pretty=format:%an <%ae>")
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(5)
-	}
-
-	if err = cmd.Start(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(6)
-	}
-
-	scanner := bufio.NewScanner(out)
-	for scanner.Scan() {
-		user := strings.TrimSpace(scanner.Text())
-		norm := strings.ToUpper(user)
-		users[norm] = user
-	}
-
-	if scanner.Err() != nil {
-		fmt.Fprintln(os.Stderr, scanner.Err())
-		os.Exit(8)
-	}
-
-	if err = cmd.Wait(); err != nil {
-		fmt.Fprintln(os.Stderr, scanner.Err())
-		os.Exit(9)
-	}
-
-	allUsers := make([]string, 0, len(users))
-	for _, user := range users {
-		allUsers = append(allUsers, user)
-	}
-
-	sort.Strings(allUsers)
-
-	return allUsers
+	return ledger
 }
