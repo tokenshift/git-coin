@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/alecthomas/kingpin"
 )
@@ -24,10 +25,53 @@ var (
 func main() {
 	switch kingpin.MustParse(app.Parse(os.Args[1:])) {
 	case give.FullCommand():
-		fmt.Println("Giving", *giveUser, *giveCoins, "coins")
+		assertNoUnstagedChanges()
+		user := findUser(*giveUser)
+		fmt.Println("Giving", *giveCoins, "coins to", user)
 	case donate.FullCommand():
-		fmt.Println("Donating", *donateCoins, "coins to", *donateUser)
+		assertNoUnstagedChanges()
+		user := findUser(*donateUser)
+		fmt.Println("Donating", *donateCoins, "coins to", user)
 	case list.FullCommand():
 		fmt.Println("TODO: list all coins")
 	}
+}
+
+func assertNoUnstagedChanges() {
+	cmd := exec.Command("git", "diff-index", "--quiet", "HEAD")
+	err := cmd.Start()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		if _, ok := err.(*exec.ExitError); ok {
+			fmt.Fprintln(os.Stderr, "Please stash or commit unstaged changes before exchanging git-coins. Dirty exchanges are unsanitary...")
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		os.Exit(2)
+	}
+}
+
+func findUser(user string) string {
+	// git log -F -i '--author=nathan clark' -1 '--pretty=format:%an <%ae>'
+	cmd := exec.Command("git", "log", "-F", "-i", "-1", "--pretty=format:%an <%ae>",
+		fmt.Sprintf("--author=%s", user))
+	out, err := cmd.Output()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(4)
+	}
+
+	actualUser := string(out)
+
+	if actualUser == "" {
+		fmt.Fprintln(os.Stderr, "User", *giveUser, "not found; using", *giveUser, "as-is")
+		actualUser = *giveUser
+	}
+
+	return actualUser
 }
