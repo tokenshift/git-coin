@@ -45,7 +45,7 @@ func main() {
 		assertNoUnstagedChanges()
 		user := findUser(*giveUser)
 
-		if *giveCoins > myCoins() {
+		if *giveCoins > myCoins() && !*giveForce {
 			fmt.Fprintln(os.Stderr, "You don't have enough coins!")
 			os.Exit(1)
 		}
@@ -133,7 +133,7 @@ func listCoins() {
 	ledger := getLedger()
 	users := allUsers()
 
-	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 4, '-', 0)
+	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 4, '.', 0)
 
 	for _, user := range users {
 		if coins, ok := ledger[strings.ToUpper(user)]; ok {
