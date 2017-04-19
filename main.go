@@ -50,7 +50,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		message := fmt.Sprintf("git-coin: Giving %v coins to %s", *giveCoins, user)
+		message := fmt.Sprintf("Giving %v coins to %s", *giveCoins, user)
 		fmt.Println(message)
 		commit(message)
 	case take.FullCommand():
@@ -63,13 +63,13 @@ func main() {
 	case donate.FullCommand():
 		assertNoUnstagedChanges()
 		user := findUser(*donateUser)
-		message := fmt.Sprintf("git-coin: Donating %v coins to %s", *donateCoins, user)
+		message := fmt.Sprintf("Donating %v coins to %s", *donateCoins, user)
 		fmt.Println(message)
 		commit(message)
 	case seed.FullCommand():
 		assertNoUnstagedChanges()
 		for _, user := range allUsers() {
-			message := fmt.Sprintf("git-coin: Donating %v coins to %s", *seedCoins, user)
+			message := fmt.Sprintf("Donating %v coins to %s", *seedCoins, user)
 			fmt.Println(message)
 			commit(message)
 		}
@@ -121,7 +121,8 @@ func findUser(user string) string {
 }
 
 func commit(message string) {
-	cmd := exec.Command("git", "commit", "--allow-empty", "-m", message)
+	fullMessage := fmt.Sprintf("git-coin: %s", message)
+	cmd := exec.Command("git", "commit", "--allow-empty", "-m", fullMessage)
 	err := cmd.Run()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
