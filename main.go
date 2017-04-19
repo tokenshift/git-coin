@@ -35,6 +35,8 @@ var (
 	seedCoins = seed.Arg("coins", "The number of coins to donate to each user.").Required().Float()
 
 	list = app.Command("list", "List all users and how many coins they have.")
+
+	info = app.Command("info", "Tell me how many coins I have.")
 )
 
 func main() {
@@ -42,6 +44,12 @@ func main() {
 	case give.FullCommand():
 		assertNoUnstagedChanges()
 		user := findUser(*giveUser)
+
+		if *giveCoins > myCoins() {
+			fmt.Fprintln(os.Stderr, "You don't have enough coins!")
+			os.Exit(1)
+		}
+
 		message := fmt.Sprintf("git-coin: Giving %v coins to %s", *giveCoins, user)
 		fmt.Println(message)
 		commit(message)
@@ -67,6 +75,10 @@ func main() {
 		}
 	case list.FullCommand():
 		listCoins()
+	case info.FullCommand():
+		user := currentUser()
+		coins := myCoins()
+		fmt.Printf("You are %s and you have %v coins.\n", user, coins)
 	}
 }
 
@@ -85,7 +97,7 @@ func assertNoUnstagedChanges() {
 		} else {
 			fmt.Fprintln(os.Stderr, err)
 		}
-		os.Exit(2)
+		os.Exit(1)
 	}
 }
 
@@ -95,7 +107,7 @@ func findUser(user string) string {
 	out, err := cmd.Output()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(3)
+		os.Exit(1)
 	}
 
 	actualUser := strings.TrimSpace(string(out))
@@ -113,7 +125,7 @@ func commit(message string) {
 	err := cmd.Run()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(4)
+		os.Exit(1)
 	}
 }
 
@@ -141,12 +153,12 @@ func allUsers() []string {
 	out, err := cmd.StdoutPipe()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(5)
+		os.Exit(1)
 	}
 
 	if err = cmd.Start(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(6)
+		os.Exit(1)
 	}
 
 	scanner := bufio.NewScanner(out)
@@ -158,12 +170,12 @@ func allUsers() []string {
 
 	if scanner.Err() != nil {
 		fmt.Fprintln(os.Stderr, scanner.Err())
-		os.Exit(8)
+		os.Exit(1)
 	}
 
 	if err = cmd.Wait(); err != nil {
 		fmt.Fprintln(os.Stderr, scanner.Err())
-		os.Exit(9)
+		os.Exit(1)
 	}
 
 	allUsers := make([]string, 0, len(users))
@@ -185,12 +197,12 @@ func getLedger() map[string]float64 {
 	out, err := cmd.StdoutPipe()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(5)
+		os.Exit(1)
 	}
 
 	if err = cmd.Start(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(6)
+		os.Exit(1)
 	}
 
 	txPattern := regexp.MustCompile(`(?i)^(.*?) - git-coin: (Giving|Donating) (\d+(\.\d+)?(e(\+|\-)?\d+)?) coins to (.*)$`)
@@ -210,7 +222,7 @@ func getLedger() map[string]float64 {
 		coinsNum, err := strconv.ParseFloat(coins, 64)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
-			os.Exit(7)
+			os.Exit(1)
 		}
 
 		if _, ok := ledger[sourceUser]; !ok {
@@ -232,13 +244,57 @@ func getLedger() map[string]float64 {
 
 	if scanner.Err() != nil {
 		fmt.Fprintln(os.Stderr, scanner.Err())
-		os.Exit(8)
+		os.Exit(1)
 	}
 
 	if err = cmd.Wait(); err != nil {
 		fmt.Fprintln(os.Stderr, scanner.Err())
-		os.Exit(9)
+		os.Exit(1)
 	}
 
 	return ledger
+}
+
+func currentUser() string {
+	name, err := exec.Command("git", "config", "user.name").Output()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	email, err := exec.Command("git", "config", "user.email").Output()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	nameStr := strings.TrimSpace(string(name))
+	emailStr := strings.TrimSpace(string(email))
+
+	if nameStr == "" || emailStr == "" {
+		fmt.Fprintln(os.Stderr, "I don't know how much money you have; I don't even know who you are!")
+
+		if nameStr == "" {
+			fmt.Fprintln(os.Stderr, "git config user.name")
+		}
+
+		if emailStr == "" {
+			fmt.Fprintln(os.Stderr, "git config user.email")
+		}
+
+		os.Exit(1)
+	}
+
+	return fmt.Sprintf("%s <%s>", nameStr, emailStr)
+}
+
+func myCoins() float64 {
+	user := currentUser()
+	ledger := getLedger()
+
+	if coins, ok := ledger[strings.ToUpper(user)]; ok {
+		return coins
+	} else {
+		return 0.0
+	}
 }
