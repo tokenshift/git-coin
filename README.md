@@ -18,7 +18,7 @@ go install github.com/tokenshift/git-coin
 ```
 
 Or download the appropriate [release](https://github.com/tokenshift/git-coin/releases)
-for your platform and put it somewhere in your $PATH.
+for your platform, rename it `git-coin`, and put it somewhere in your $PATH.
 
 ## Usage
 

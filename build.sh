@@ -7,7 +7,7 @@ IFS='/'
 
 set -x
 
+mkdir release
 go tool dist list | while read os arch; do
-	mkdir -p "./release/${os}_${arch}/"
-	env GOOS=$os GOARCH=$arch go build -o "./release/${os}_${arch}/$APP_NAME" "$APP_REPO"
+	env GOOS=$os GOARCH=$arch go build -o "./release/${APP_NAME}.${os}_${arch}" "$APP_REPO"
 done
